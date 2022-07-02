@@ -3,6 +3,7 @@ from tkinter import *
 import tkinter as tk
 import time
 import datetime
+import random
 
 class Window (tk.Frame):
 	
@@ -11,10 +12,12 @@ class Window (tk.Frame):
 		self.root=root
 		self.set_user=None
 		self.log_or_reg=True
+		self.during_test=False
 		self.conn_host="127.0.0.1"
-		self.conn_user="user"
-		self.conn_database="database"
+		self.conn_user="username"
+		self.conn_database="pol_eng"
 		self.conn_password="password"
+		self.language="English"
 		self.login_Page()
 		
 	def login_Page (self):
@@ -89,16 +92,20 @@ class Window (tk.Frame):
 		self.btnq.place(x=450, y=450, width=100, height=30)
 		
 	def user_Page (self):
+		if self.during_test:
+			self.clear_frame()
+			self.during_test=False
+		
 		self.redirect_text = Label(self.root, text=f"Showing user {self.set_user} page")
 		self.redirect_text.place(x=200, y=350, width=200, height=30)
 		
 		self.btns = Button(self.root, text='Sign Out', command=self.sign_out)
 		self.btns.place(x=450, y=50, width=100, height=30)
 		
-		self.start_test_e2p = Button (self.root, text='ENG to POL', command=lambda: self.test_Page("English"))
+		self.start_test_e2p = Button (self.root, text='ENG to POL', command=lambda: self.test_Page(language="English"))
 		self.start_test_e2p.place(x=250, y=150, width=100, height=30)
 		
-		self.start_test_p2e = Button (self.root, text='POL to ENG', command=lambda: self.sign_out("Polish"))
+		self.start_test_p2e = Button (self.root, text='POL to ENG', command=lambda: self.sign_out(language="Polish"))
 		self.start_test_p2e.place(x=250, y=200, width=100, height=30)
 		
 		self.btnq = Button(self.root, text='Quit', command=quit)
@@ -107,7 +114,21 @@ class Window (tk.Frame):
 	def admin_page (self):
 		pass
 		
-	def test_Page (self, language):
+	def test_Page (self, language=self.language):
+		self.language=language
+		if not self.during_test:
+			self.clear_frame()
+			self.during_test=True
+	
+		self.btns = Button(self.root, text='Sign Out', command=self.sign_out)
+		self.btns.place(x=450, y=50, width=100, height=30)
+		
+		self.btns = Button(self.root, text='Main Page', command=self.user_Page)
+		self.btns.place(x=450, y=150, width=100, height=30)
+		
+		self.btnq = Button(self.root, text='Quit', command=quit)
+		self.btnq.place(x=450, y=450, width=100, height=30)
+		
 		try:
 			conn = mysql.connector.connect(
 				host=self.conn_host,
@@ -123,9 +144,32 @@ class Window (tk.Frame):
 		mycursor=conn.cursor()
 		
 		query = "SELECT * FROM(SELECT polish_word, english_word, COUNT(is_correct) AS 'ans' FROM dictionary RIGHT JOIN answers ON dictionary.id=answers.word_id UNION SELECT polish_word, english_word, 0 AS 'ans' FROM dictionary) AS dft GROUP BY polish_word ORDER BY ans ASC;"
+		
 		mycursor.execute(query)
 		
 		words_table=mycursor.fetchall()
+		population=[]
+		words=[]
+		
+		for row in words_table:
+			population.append(row[i][2])
+			words.append(row[i][:2])
+		
+		question=random.choices(words, weights=population, k=1)
+		
+		if language=="Polish":
+			self.text_label = Label(self.root, text=question[0])
+			answ=1
+		elif language=="English":
+			self.text_label = Label(self.root, text=question[1])
+			answ=0
+		self.text_label.place(x=200, y=250, width=200, height=30)
+		
+		self.check_ans = Button(self.root, text="Check Answer", command=lambda:self.check_answer(question[answ]))
+		self.check_ans.place(x=225, y=300, width=150, height=30)
+		
+		self.next_qst = Button(self.root, text="Next question", command=self.next_question)
+		self.next_qst.place(x=225, y=400, width=150, height=30)
 		
 	def authentication(self):
 		try:
@@ -218,9 +262,20 @@ class Window (tk.Frame):
 	def insert_words (self):
 		pass
 
-	def check_answer (self):
-		pass
-	
+	def next_question (self):
+		#insert into answers table
+		conn.close()
+		test_Page()
+
+	def check_answer (self, answr):
+		self.text_label = Label(self.root, text=answr)
+		self.text_label.place(x=200, y=350, width=200, height=30)
+		
+		#insert into answers table
+		
+		self.next_qst = Button(self.root, text="Next question", command=self.next_question)
+		self.next_qst.place(x=225, y=400, width=150, height=30)
+		
 	def sign_out (self):
 		self.set_user=None
 		self.login_Page()
