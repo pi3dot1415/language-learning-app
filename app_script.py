@@ -105,17 +105,45 @@ class Window (tk.Frame):
 		self.start_test_e2p = Button (self.root, text='ENG to POL', command=lambda: self.test_Page(language="English"))
 		self.start_test_e2p.place(x=250, y=150, width=100, height=30)
 		
-		self.start_test_p2e = Button (self.root, text='POL to ENG', command=lambda: self.sign_out(language="Polish"))
+		self.start_test_p2e = Button (self.root, text='POL to ENG', command=lambda: self.test_Page(language="Polish"))
 		self.start_test_p2e.place(x=250, y=200, width=100, height=30)
 		
 		self.btnq = Button(self.root, text='Quit', command=quit)
 		self.btnq.place(x=450, y=450, width=100, height=30)
 		
 	def admin_page (self):
-		pass
-		
-	def test_Page (self, language=self.language):
 		self.language=language
+		if not self.during_test:
+			self.clear_frame()
+			self.during_test=True
+		
+		self.var_english=StringVar()
+		self.var_poish=StringVar()
+		
+		self.btns = Button(self.root, text='Sign Out', command=self.sign_out)
+		self.btns.place(x=450, y=50, width=100, height=30)
+		
+		self.btnq = Button(self.root, text='Quit', command=quit)
+		self.btnq.place(x=450, y=450, width=100, height=30)
+		
+		self.text_label = Label(self.root, text='Insert polish word')
+		self.text_label.place(x=200, y=200, width=200, height=30)
+		
+		self.type_pol = Entry(self.root, textvariable=self.var_polish)
+		self.type_pol.place(x=225, y=250, width=150, height=30)
+		
+		self.text_label = Label(self.root, text='Insert english word')
+		self.text_label.place(x=200, y=300, width=200, height=30)
+		
+		self.type_eng = Entry(self.root, textvariable=self.var_english)
+		self.type_eng.place(x=225, y=350, width=150, height=30)
+		
+		self.inst_words = Button(self.root, text="Insert words", command=self.insert_words)
+		self.inst_words.place(x=225, y=400, width=150, height=30)
+				
+	def test_Page (self, language=False):
+		if language:
+			self.language=language
 		if not self.during_test:
 			self.clear_frame()
 			self.during_test=True
@@ -157,10 +185,10 @@ class Window (tk.Frame):
 		
 		question=random.choices(words, weights=population, k=1)
 		
-		if language=="Polish":
+		if self.language=="Polish":
 			self.text_label = Label(self.root, text=question[0])
 			answ=1
-		elif language=="English":
+		elif self.language=="English":
 			self.text_label = Label(self.root, text=question[1])
 			answ=0
 		self.text_label.place(x=200, y=250, width=200, height=30)
@@ -260,7 +288,29 @@ class Window (tk.Frame):
 		conn.close()
 	
 	def insert_words (self):
-		pass
+		try:
+			conn = mysql.connector.connect(
+				host=self.conn_host,
+				user=self.conn_user,
+				database=self.conn_database,
+				password=self.conn_password
+			)
+		except:
+			self.redirect_text = Label(self.root, text="Cannot connect")
+			self.redirect_text.place(x=225, y=350, width=150, height=30)
+			return None
+		
+		mycursor=conn.cursor()
+		
+		word_pl=self.var_polish.get()
+		word_en=self.var_eglish.get()
+		
+		subquery=str((word_pl,word_en))
+		query = "INSERT INTO dictionary(polish_word, english_word) VALUES"+subquery+";"
+		
+		mycursor.execute(query)
+		
+		conn.close()
 
 	def next_question (self):
 		#insert into answers table
