@@ -11,6 +11,10 @@ class Window (tk.Frame):
 		self.root=root
 		self.set_user=None
 		self.log_or_reg=True
+		self.conn_host="127.0.0.1"
+		self.conn_user="user"
+		self.conn_database="database"
+		self.conn_password="password"
 		self.login_Page()
 		
 	def login_Page (self):
@@ -81,15 +85,21 @@ class Window (tk.Frame):
 		self.redirect_to_registration = Button(self.root, text='Login', command=lambda:self.login_Page())
 		self.redirect_to_registration.place(x=225, y=450, width=150, height=30)
 		
-		self.btnq = Button(self.root, text='Quit', command=quit)
+		self.btnq = Button(self.root, text='Quit', command=self.quit)
 		self.btnq.place(x=450, y=450, width=100, height=30)
 		
 	def user_Page (self):
 		self.redirect_text = Label(self.root, text=f"Showing user {self.set_user} page")
 		self.redirect_text.place(x=200, y=350, width=200, height=30)
 		
-		self.btnq = Button(self.root, text='Sign Out', command=self.sign_out)
-		self.btnq.place(x=450, y=50, width=100, height=30)
+		self.btns = Button(self.root, text='Sign Out', command=self.sign_out)
+		self.btns.place(x=450, y=50, width=100, height=30)
+		
+		self.start_test_e2p = Button (self.root, text='ENG to POL', command=lambda: self.test_Page("English"))
+		self.start_test_e2p.place(x=250, y=150, width=100, height=30)
+		
+		self.start_test_p2e = Button (self.root, text='POL to ENG', command=lambda: self.sign_out("Polish"))
+		self.start_test_p2e.place(x=250, y=200, width=100, height=30)
 		
 		self.btnq = Button(self.root, text='Quit', command=quit)
 		self.btnq.place(x=450, y=450, width=100, height=30)
@@ -97,16 +107,33 @@ class Window (tk.Frame):
 	def admin_page (self):
 		pass
 		
-	def test_Page (self):
-		pass
-	
+	def test_Page (self, language):
+		try:
+			conn = mysql.connector.connect(
+				host=self.conn_host,
+				user=self.conn_user,
+				database=self.conn_database,
+				password=self.conn_password
+			)
+		except:
+			self.redirect_text = Label(self.root, text="Cannot connect")
+			self.redirect_text.place(x=225, y=350, width=150, height=30)
+			return None
+
+		mycursor=conn.cursor()
+		
+		query = "SELECT * FROM(SELECT polish_word, english_word, COUNT(is_correct) AS 'ans' FROM dictionary RIGHT JOIN answers ON dictionary.id=answers.word_id UNION SELECT polish_word, english_word, 0 AS 'ans' FROM dictionary) AS dft GROUP BY polish_word ORDER BY ans ASC;"
+		mycursor.execute(query)
+		
+		words_table=mycursor.fetchall()
+		
 	def authentication(self):
 		try:
 			conn = mysql.connector.connect(
-				host="127.0.0.1",
-				user="user",
-				database="pol_eng",
-				password="password"
+				host=self.conn_host,
+				user=self.conn_user,
+				database=self.conn_database,
+				password=self.conn_password
 			)
 		except:
 			self.redirect_text = Label(self.root, text="Cannot connect")
@@ -143,10 +170,10 @@ class Window (tk.Frame):
 	def registration (self):
 		try:
 			conn = mysql.connector.connect(
-				host="127.0.0.1",
-				user="user",
-				database="pol_eng",
-				password="password"
+				host=self.conn_host,
+				user=self.conn_user,
+				database=self.conn_database,
+				password=self.conn_password
 			)
 		except:
 			self.redirect_text = Label(self.root, text="Cannot connect")
@@ -209,4 +236,5 @@ root=tk.Tk()
 main = Window(root)
 root.title('Fiszki')
 root.wm_geometry('600x600')
+#root.protocol("WM_DELETE_WINDOW", lambda: root.quit())
 root.mainloop()
