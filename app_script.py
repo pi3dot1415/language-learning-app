@@ -13,8 +13,9 @@ class Window (tk.Frame):
 		self.set_user=None
 		self.log_or_reg=True
 		self.during_test=False
+		self.correct=""
 		self.conn_host="127.0.0.1"
-		self.conn_user="username"
+		self.conn_user="Username"
 		self.conn_database="pol_eng"
 		self.conn_password="password"
 		self.language="English"
@@ -88,7 +89,7 @@ class Window (tk.Frame):
 		self.redirect_to_registration = Button(self.root, text='Login', command=lambda:self.login_Page())
 		self.redirect_to_registration.place(x=225, y=450, width=150, height=30)
 		
-		self.btnq = Button(self.root, text='Quit', command=self.quit)
+		self.btnq = Button(self.root, text='Quit', command=quit)
 		self.btnq.place(x=450, y=450, width=100, height=30)
 		
 	def user_Page (self):
@@ -112,13 +113,12 @@ class Window (tk.Frame):
 		self.btnq.place(x=450, y=450, width=100, height=30)
 		
 	def admin_page (self):
-		self.language=language
 		if not self.during_test:
 			self.clear_frame()
 			self.during_test=True
 		
 		self.var_english=StringVar()
-		self.var_poish=StringVar()
+		self.var_polish=StringVar()
 		
 		self.btns = Button(self.root, text='Sign Out', command=self.sign_out)
 		self.btns.place(x=450, y=50, width=100, height=30)
@@ -180,21 +180,30 @@ class Window (tk.Frame):
 		words=[]
 		
 		for row in words_table:
-			population.append(row[i][2])
-			words.append(row[i][:2])
+			if row != (None, None, 0):
+				population.append(row[2])
+				words.append(row[:2])
+		m=max(population)
+		
+		for i in range(len(words)):
+			population[i]=m+1-population[i]
 		
 		question=random.choices(words, weights=population, k=1)
-		
 		if self.language=="Polish":
-			self.text_label = Label(self.root, text=question[0])
+			self.text_label = Label(self.root, text=question[0][0])
 			answ=1
 		elif self.language=="English":
-			self.text_label = Label(self.root, text=question[1])
+			self.text_label = Label(self.root, text=question[0][1])
 			answ=0
 		self.text_label.place(x=200, y=250, width=200, height=30)
 		
-		self.check_ans = Button(self.root, text="Check Answer", command=lambda:self.check_answer(question[answ]))
-		self.check_ans.place(x=225, y=300, width=150, height=30)
+		self.var_answer=StringVar()
+		
+		self.print_answer = Entry(self.root, textvariable=self.var_answer)
+		self.print_answer.place(x=225, y=300, width=150, height=30)
+		
+		self.check_ans = Button(self.root, text="Check Answer", command=lambda:self.check_answer(question[0][answ]))
+		self.check_ans.place(x=225, y=350, width=150, height=30)
 		
 		self.next_qst = Button(self.root, text="Next question", command=self.next_question)
 		self.next_qst.place(x=225, y=400, width=150, height=30)
@@ -223,10 +232,10 @@ class Window (tk.Frame):
 		password_=mycursor.fetchall()
 		
 		try:
-			if password == password_[0]:
+			if password == password_[0][0]:
 				self.set_user=login
 				self.clear_frame()
-				if login=="admin":
+				if login.lower()=="admin":
 					self.admin_page()
 				else:
 					self.user_Page()
@@ -271,10 +280,12 @@ class Window (tk.Frame):
 			if password==password2 and len(password)>=8:
 				subquery=str((login, password, str(datetime.datetime.today()).split()[0]))
 				query = "INSERT INTO users (login, password_, join_date) VALUES "+subquery+";"
-				#mycursor.execute(query)
+				print(query)
+				mycursor.execute(query)
+				conn.commit()
 				self.set_user=login
 				self.clear_frame()
-				if login=="admin":
+				if login.lower()=="admin":
 					self.admin_page()
 				else:
 					self.user_Page()
@@ -303,22 +314,30 @@ class Window (tk.Frame):
 		mycursor=conn.cursor()
 		
 		word_pl=self.var_polish.get()
-		word_en=self.var_eglish.get()
+		word_en=self.var_english.get()
+		
+		if word_en =="" or word_pl=="":
+			conn.close()
+			return None
 		
 		subquery=str((word_pl,word_en))
 		query = "INSERT INTO dictionary(polish_word, english_word) VALUES"+subquery+";"
 		
 		mycursor.execute(query)
+		conn.commit()
 		
 		conn.close()
+		
+		self.during_test=False
+		self.admin_page()
 
 	def next_question (self):
 		#insert into answers table
-		conn.close()
-		test_Page()
+		#conn.close()
+		self.test_Page()
 
 	def check_answer (self, answr):
-		self.text_label = Label(self.root, text=answr)
+		self.text_label = Label(self.root, text="Correct answer: "+answr)
 		self.text_label.place(x=200, y=350, width=200, height=30)
 		
 		#insert into answers table
@@ -341,5 +360,4 @@ root=tk.Tk()
 main = Window(root)
 root.title('Fiszki')
 root.wm_geometry('600x600')
-#root.protocol("WM_DELETE_WINDOW", lambda: root.quit())
 root.mainloop()
