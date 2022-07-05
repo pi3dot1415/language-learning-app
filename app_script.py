@@ -17,7 +17,7 @@ class Window (tk.Frame):
 		self.conn_host="127.0.0.1"
 		self.conn_user="Username"
 		self.conn_database="pol_eng"
-		self.conn_password="password"
+		self.conn_password="Password"
 		self.language="English"
 		self.login_Page()
 		
@@ -171,7 +171,7 @@ class Window (tk.Frame):
 
 		mycursor=conn.cursor()
 		
-		query = "SELECT * FROM(SELECT polish_word, english_word, COUNT(is_correct) AS 'ans' FROM dictionary RIGHT JOIN answers ON dictionary.id=answers.word_id UNION SELECT polish_word, english_word, 0 AS 'ans' FROM dictionary) AS dft GROUP BY polish_word ORDER BY ans ASC;"
+		query = "SELECT * FROM(SELECT dictionary.id, polish_word, english_word, COUNT(is_correct) AS 'ans' FROM dictionary RIGHT JOIN answers ON dictionary.id=answers.word_id UNION SELECT dictionary.id, polish_word, english_word, 0 AS 'ans' FROM dictionary) AS dft GROUP BY polish_word ORDER BY ans ASC;"
 		
 		mycursor.execute(query)
 		
@@ -181,8 +181,8 @@ class Window (tk.Frame):
 		
 		for row in words_table:
 			if row != (None, None, 0):
-				population.append(row[2])
-				words.append(row[:2])
+				population.append(row[3])
+				words.append(row[:3])
 		m=max(population)
 		
 		for i in range(len(words)):
@@ -190,11 +190,11 @@ class Window (tk.Frame):
 		
 		question=random.choices(words, weights=population, k=1)
 		if self.language=="Polish":
-			self.text_label = Label(self.root, text=question[0][0])
-			answ=1
-		elif self.language=="English":
 			self.text_label = Label(self.root, text=question[0][1])
-			answ=0
+			answ=2
+		elif self.language=="English":
+			self.text_label = Label(self.root, text=question[0][2])
+			answ=1
 		self.text_label.place(x=200, y=250, width=200, height=30)
 		
 		self.var_answer=StringVar()
@@ -202,10 +202,10 @@ class Window (tk.Frame):
 		self.print_answer = Entry(self.root, textvariable=self.var_answer)
 		self.print_answer.place(x=225, y=300, width=150, height=30)
 		
-		self.check_ans = Button(self.root, text="Check Answer", command=lambda:self.check_answer(question[0][answ]))
+		self.check_ans = Button(self.root, text="Check Answer", command=lambda:self.check_answer(question,answ))
 		self.check_ans.place(x=225, y=350, width=150, height=30)
 		
-		self.next_qst = Button(self.root, text="Next question", command=self.next_question)
+		self.next_qst = Button(self.root, text="Next question", command=lambda:self.next_question(question,answ))
 		self.next_qst.place(x=225, y=400, width=150, height=30)
 		
 	def authentication(self):
@@ -224,15 +224,21 @@ class Window (tk.Frame):
 		mycursor=conn.cursor()
 		
 		login=self.var_login.get()
+		
 		password=self.var_password.get()
 		
-		query = "SELECT password_ FROM users WHERE login LIKE '"+login+"';"
+		query = "SELECT id, login, password_ FROM users WHERE login LIKE '"+login+"';"
 		mycursor.execute(query)
 		
 		password_=mycursor.fetchall()
 		
 		try:
-			if password == password_[0][0]:
+			if password_[0][1]!=login:
+				self.redirect_text = Label(self.root, text="Wrong login")
+				self.redirect_text.place(x=225, y=350, width=150, height=30)
+				return None
+			self.user_id=password_[0][0]
+			if password == password_[0][2]:
 				self.set_user=login
 				self.clear_frame()
 				if login.lower()=="admin":
@@ -267,20 +273,20 @@ class Window (tk.Frame):
 		password=self.var_password_r.get()
 		password2=self.var_password_r2.get()
 		
-		query = "SELECT login FROM users WHERE login LIKE '"+login+"';"
+		query = "SELECT id, login FROM users WHERE login LIKE '"+login+"';"
 		mycursor.execute(query)
 		
 		login_=mycursor.fetchall()
+		self.user_id=login[0][0]
 		
 		try:
-			if login == login_[0]:
+			if login == login_[0][1]:
 				self.redirect_text = Label(self.root, text="Login is currently used")
 				self.redirect_text.place(x=225, y=350, width=150, height=30)
 		except:
 			if password==password2 and len(password)>=8:
 				subquery=str((login, password, str(datetime.datetime.today()).split()[0]))
 				query = "INSERT INTO users (login, password_, join_date) VALUES "+subquery+";"
-				print(query)
 				mycursor.execute(query)
 				conn.commit()
 				self.set_user=login
@@ -331,18 +337,58 @@ class Window (tk.Frame):
 		self.during_test=False
 		self.admin_page()
 
-	def next_question (self):
-		#insert into answers table
-		#conn.close()
+	def next_question (self, question, answ, is_correct=None):
+		try:
+			conn = mysql.connector.connect(
+				host=self.conn_host,
+				user=self.conn_user,
+				database=self.conn_database,
+				password=self.conn_password
+			)
+		except:
+			self.redirect_text = Label(self.root, text="Cannot connect")
+			self.redirect_text.place(x=225, y=350, width=150, height=30)
+			return None
+		
+		if is_correct==None:
+			if question[0][answ].lower()==self.var_answer.get():
+				is_correct="Correct"
+			elif self.var_answer.get()=="":
+				is_correct="Skipped"
+			else:
+				is_correct="Wrong"
+		
+		if answ==1:
+			language_="POL"
+		else:
+			language_="ENG"
+		
+		mycursor=conn.cursor()
+		
+		subquery=str((self.user_id, question[0][0], language_, is_correct, str(datetime.datetime.today()).split()[0]))
+		query = "INSERT INTO answers(user_id, word_id, word_language, is_correct, answer_date) VALUES"+subquery+";"
+		
+		print(query)
+		mycursor.execute(query)
+		conn.commit()
+		
+		conn.close()
+		self.during_test=False
 		self.test_Page()
 
-	def check_answer (self, answr):
-		self.text_label = Label(self.root, text="Correct answer: "+answr)
+	def check_answer (self, question, answ):
+		self.text_label = Label(self.root, text="Your answer: "+self.var_answer.get())
+		self.text_label.place(x=200, y=300, width=200, height=30)
+	
+		self.text_label = Label(self.root, text="Correct answer: "+question[0][answ])
 		self.text_label.place(x=200, y=350, width=200, height=30)
 		
-		#insert into answers table
+		if question[0][answ].lower()==self.var_answer.get():
+			is_correct="Correct"
+		else:
+			is_correct="Wrong"
 		
-		self.next_qst = Button(self.root, text="Next question", command=self.next_question)
+		self.next_qst = Button(self.root, text="Next question", command=lambda:self.next_question(question, answ, is_correct))
 		self.next_qst.place(x=225, y=400, width=150, height=30)
 		
 	def sign_out (self):
